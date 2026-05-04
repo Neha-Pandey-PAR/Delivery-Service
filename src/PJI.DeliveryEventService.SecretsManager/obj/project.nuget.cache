@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "dgSpecHash": "bYWTD0F9d8w=",
+  "success": true,
+  "projectFilePath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService.SecretsManager\\PJI.DeliveryEventService.SecretsManager.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.core\\4.0.3.16\\awssdk.core.4.0.3.16.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.secretsmanager\\4.0.4.3\\awssdk.secretsmanager.4.0.4.3.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.securitytoken\\4.0.5.6\\awssdk.securitytoken.4.0.5.6.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.sso\\4.0.2.15\\awssdk.sso.4.0.2.15.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.ssooidc\\4.0.3.16\\awssdk.ssooidc.4.0.3.16.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.configuration\\10.0.1\\microsoft.extensions.configuration.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\10.0.1\\microsoft.extensions.configuration.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.configuration.binder\\10.0.1\\microsoft.extensions.configuration.binder.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\10.0.1\\microsoft.extensions.dependencyinjection.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.diagnostics.abstractions\\10.0.1\\microsoft.extensions.diagnostics.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.fileproviders.abstractions\\10.0.1\\microsoft.extensions.fileproviders.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.hosting.abstractions\\10.0.1\\microsoft.extensions.hosting.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\10.0.1\\microsoft.extensions.logging.abstractions.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.options\\10.0.1\\microsoft.extensions.options.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.primitives\\10.0.1\\microsoft.extensions.primitives.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\system.threading.tasks.dataflow\\10.0.1\\system.threading.tasks.dataflow.10.0.1.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1507",
+      "level": "Warning",
+      "message": "There are 4 package sources defined in your configuration. When using central package management, please map your package sources with package source mapping (https://aka.ms/nuget-package-source-mapping) or specify a single package source. The following sources are defined: Brink, BrinkLegacy, nuget.org, DevExpress",
+      "projectPath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService.SecretsManager\\PJI.DeliveryEventService.SecretsManager.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService.SecretsManager\\PJI.DeliveryEventService.SecretsManager.csproj",
+      "targetGraphs": []
+    },
+    {
+      "code": "NU1510",
+      "level": "Warning",
+      "message": "PackageReference System.Threading.Tasks.Dataflow will not be pruned. Consider removing this package from your dependencies, as it is likely unnecessary.",
+      "projectPath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService.SecretsManager\\PJI.DeliveryEventService.SecretsManager.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService.SecretsManager\\PJI.DeliveryEventService.SecretsManager.csproj",
+      "libraryId": "System.Threading.Tasks.Dataflow",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
+}

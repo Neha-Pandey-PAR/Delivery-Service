@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Packages.props" />
+    <File Path=".runsettings" />
+  </Folder>
+  <Project Path="src/PJI.DeliveryEventService/PJI.DeliveryEventService.csproj" />
+  <Project Path="src/PJI.DeliveryEventService.SecretsManager/PJI.DeliveryEventService.SecretsManager.csproj" />
+  <Project Path="src/PJI.DeliveryEventService.SecretsManager.Tests/PJI.DeliveryEventService.SecretsManager.Tests.csproj" />
+  <Project Path="src/PJI.DeliveryEventService.Tests/PJI.DeliveryEventService.Tests.csproj" />
+</Solution>

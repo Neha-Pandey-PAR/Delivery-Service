@@ -1,0 +1,222 @@
+{
+  "info": {
+    "name": "PJI.DeliveryEventService",
+    "description": "Smoke tests for the PJI Delivery Event Service. Set the collection variables (base_url, hmac_client_name, hmac_key_id, hmac_secret) before running.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000" },
+    { "key": "hmac_client_name", "value": "PJI" },
+    { "key": "hmac_key_id", "value": "pji-key-v1" },
+    { "key": "hmac_secret", "value": "BASE64_ENCODED_SECRET_HERE", "description": "Base64-encoded HMAC secret bytes" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const CryptoJS = require('crypto-js');",
+          "",
+          "const timestamp = Math.floor(Date.now() / 1000).toString();",
+          "const nonce = pm.variables.replaceIn('{{$guid}}');",
+          "const method = pm.request.method.toUpperCase();",
+          "",
+          "// Build path-with-query exactly as the server sees it (Request.Path + Request.QueryString).",
+          "// Postman's url.getPath() already returns a leading slash; do NOT prepend another.",
+          "let path = pm.request.url.getPath();",
+          "if (!path.startsWith('/')) path = '/' + path;",
+          "const query = pm.request.url.getQueryString();",
+          "const pathWithQuery = query ? `${path}?${query}` : path;",
+          "",
+          "// Resolve any {{variables}} in the body before hashing — what we hash must match what's on the wire.",
+          "let body = '';",
+          "if (pm.request.body && pm.request.body.raw) {",
+          "    body = pm.variables.replaceIn(pm.request.body.raw);",
+          "}",
+          "",
+          "const bodyHash = CryptoJS.SHA256(body).toString(CryptoJS.enc.Hex);",
+          "const signingString = [method, pathWithQuery, timestamp, nonce, bodyHash].join('\\n');",
+          "",
+          "const secretBase64 = pm.collectionVariables.get('hmac_secret');",
+          "const secret = CryptoJS.enc.Base64.parse(secretBase64);",
+          "const signature = CryptoJS.HmacSHA256(signingString, secret).toString(CryptoJS.enc.Hex);",
+          "",
+          "const clientName = pm.collectionVariables.get('hmac_client_name');",
+          "const keyId = pm.collectionVariables.get('hmac_key_id');",
+          "const authValue = `HMAC ${clientName}:${keyId}:${timestamp}:${nonce}:${signature}`;",
+          "",
+          "pm.request.headers.upsert({ key: 'Authorization', value: authValue });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Dropped Off - 3PD Success",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-abc123\",\n  \"locationNumber\": 12345,\n  \"isInternal\": false\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/12345/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "12345", "events", "dropped-off"] }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": ["pm.test('Status 202', () => pm.response.to.have.status(202));"] }
+      }]
+    },
+    {
+      "name": "Dropped Off - 1PD No-op",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-def456\",\n  \"locationNumber\": 12345,\n  \"isInternal\": true,\n  \"employeeId\": 345\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/12345/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "12345", "events", "dropped-off"] }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": ["pm.test('Status 202', () => pm.response.to.have.status(202));"] }
+      }]
+    },
+    {
+      "name": "Dropped Off - Invalid OrderId",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-bad-order\",\n  \"locationNumber\": 12345,\n  \"isInternal\": false\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/0/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "0", "events", "dropped-off"] }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }
+      }]
+    },
+    {
+      "name": "Dropped Off - Unknown Location",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-ghi789\",\n  \"locationNumber\": 99999,\n  \"isInternal\": false\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/12345/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "12345", "events", "dropped-off"] }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": ["pm.test('Status 404', () => pm.response.to.have.status(404));"] }
+      }]
+    },
+    {
+      "name": "Dropped Off - 1PD Missing EmployeeId",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-no-emp\",\n  \"locationNumber\": 12345,\n  \"isInternal\": true\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/12345/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "12345", "events", "dropped-off"] }
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": ["pm.test('Status 400', () => pm.response.to.have.status(400));"] }
+      }]
+    },
+    {
+      "name": "Dropped Off - No Auth Header",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-noauth\",\n  \"locationNumber\": 12345,\n  \"isInternal\": false\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/12345/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "12345", "events", "dropped-off"] }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": { "type": "text/javascript", "exec": ["pm.request.headers.remove('Authorization');"] }
+        },
+        {
+          "listen": "test",
+          "script": { "type": "text/javascript", "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"] }
+        }
+      ]
+    },
+    {
+      "name": "Dropped Off - Invalid Signature",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"eventId\": \"evt-badsig\",\n  \"locationNumber\": 12345,\n  \"isInternal\": false\n}"
+        },
+        "url": { "raw": "{{base_url}}/v1/orders/12345/events/dropped-off", "host": ["{{base_url}}"], "path": ["v1", "orders", "12345", "events", "dropped-off"] }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const auth = pm.request.headers.get('Authorization');",
+              "if (auth) {",
+              "    pm.request.headers.upsert({ key: 'Authorization', value: auth.slice(0, -4) + 'dead' });",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": { "type": "text/javascript", "exec": ["pm.test('Status 401', () => pm.response.to.have.status(401));"] }
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": { "type": "text/javascript", "exec": ["pm.request.headers.remove('Authorization');"] }
+        },
+        {
+          "listen": "test",
+          "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+        }
+      ]
+    },
+    {
+      "name": "Readiness Check",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/readiness", "host": ["{{base_url}}"], "path": ["readiness"] }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": { "type": "text/javascript", "exec": ["pm.request.headers.remove('Authorization');"] }
+        },
+        {
+          "listen": "test",
+          "script": { "type": "text/javascript", "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] }
+        }
+      ]
+    }
+  ]
+}

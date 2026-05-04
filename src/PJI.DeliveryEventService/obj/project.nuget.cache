@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "dgSpecHash": "9QjzpGJs+oo=",
+  "success": true,
+  "projectFilePath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService\\PJI.DeliveryEventService.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\kumawatm\\.nuget\\packages\\asp.versioning.abstractions\\8.1.0\\asp.versioning.abstractions.8.1.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\asp.versioning.http\\8.1.0\\asp.versioning.http.8.1.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\asp.versioning.mvc\\8.1.0\\asp.versioning.mvc.8.1.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\asp.versioning.mvc.apiexplorer\\8.1.0\\asp.versioning.mvc.apiexplorer.8.1.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.core\\4.0.4\\awssdk.core.4.0.4.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.extensions.netcore.setup\\4.0.1\\awssdk.extensions.netcore.setup.4.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.secretsmanager\\4.0.4.3\\awssdk.secretsmanager.4.0.4.3.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.securitytoken\\4.0.5.6\\awssdk.securitytoken.4.0.5.6.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.sqs\\4.0.2.27\\awssdk.sqs.4.0.2.27.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.sso\\4.0.2.15\\awssdk.sso.4.0.2.15.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\awssdk.ssooidc\\4.0.3.16\\awssdk.ssooidc.4.0.3.16.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.0\\microsoft.aspnetcore.openapi.10.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.dependencymodel\\9.0.0\\microsoft.extensions.dependencymodel.9.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.extensions.diagnostics.healthchecks\\10.0.1\\microsoft.extensions.diagnostics.healthchecks.10.0.1.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog\\4.2.0\\serilog.4.2.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.aspnetcore\\9.0.0\\serilog.aspnetcore.9.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.extensions.hosting\\9.0.0\\serilog.extensions.hosting.9.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.extensions.logging\\9.0.0\\serilog.extensions.logging.9.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.formatting.compact\\3.0.0\\serilog.formatting.compact.3.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.settings.configuration\\9.0.0\\serilog.settings.configuration.9.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.sinks.console\\6.0.0\\serilog.sinks.console.6.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.sinks.debug\\3.0.0\\serilog.sinks.debug.3.0.0.nupkg.sha512",
+    "C:\\Users\\kumawatm\\.nuget\\packages\\serilog.sinks.file\\6.0.0\\serilog.sinks.file.6.0.0.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1507",
+      "level": "Warning",
+      "message": "There are 4 package sources defined in your configuration. When using central package management, please map your package sources with package source mapping (https://aka.ms/nuget-package-source-mapping) or specify a single package source. The following sources are defined: Brink, BrinkLegacy, nuget.org, DevExpress",
+      "projectPath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService\\PJI.DeliveryEventService.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService\\PJI.DeliveryEventService.csproj",
+      "targetGraphs": []
+    },
+    {
+      "code": "NU1510",
+      "level": "Warning",
+      "message": "PackageReference Microsoft.Extensions.Diagnostics.HealthChecks will not be pruned. Consider removing this package from your dependencies, as it is likely unnecessary.",
+      "projectPath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService\\PJI.DeliveryEventService.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\git\\PJI.DeliveryEventService\\src\\PJI.DeliveryEventService\\PJI.DeliveryEventService.csproj",
+      "libraryId": "Microsoft.Extensions.Diagnostics.HealthChecks",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
+}
