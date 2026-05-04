@@ -180,6 +180,11 @@ internal static class ServiceCollectionExtensions
 
     private static void AddDispatcher(IServiceCollection services, IConfiguration configuration)
     {
+        // The API path also needs the queue URL resolved (DeliveryEventQueue
+        // reads it from SqsOptions). Register a hosted service that resolves
+        // it once at startup regardless of whether the dispatcher itself runs.
+        services.AddHostedService<SqsQueueUrlResolver>();
+
         // The dispatcher background worker is unrelated to the HTTP API and
         // is intended to run as a separate deployment. Allow it to be
         // disabled via configuration so the API Lambda does not poll SQS.
@@ -196,14 +201,6 @@ internal static class ServiceCollectionExtensions
         {
             var sqsClient = sp.GetRequiredService<IAmazonSQS>();
             var sqsOptions = sp.GetRequiredService<IOptions<SqsOptions>>();
-
-            // Resolve queue URL from queue name once at startup, before the dispatcher starts polling.
-            if (string.IsNullOrEmpty(sqsOptions.Value.PersistenceQueueUrl))
-            {
-                sqsOptions.Value.PersistenceQueueUrl = sqsClient
-                    .GetQueueUrlAsync(sqsOptions.Value.PersistenceQueueName)
-                    .GetAwaiter().GetResult().QueueUrl;
-            }
 
             return new DeliveryEventDispatcher(
                 sp.GetServices<IDeliveryEventProcessor>(),

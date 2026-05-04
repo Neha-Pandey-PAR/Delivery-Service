@@ -14,7 +14,6 @@ WORKDIR /src
 
 # Copy central package management + project files first for layer caching.
 COPY Directory.Packages.props ./
-COPY NuGet.config* ./
 COPY src/PJI.DeliveryEventService/PJI.DeliveryEventService.csproj src/PJI.DeliveryEventService/
 COPY src/PJI.DeliveryEventService.SecretsManager/PJI.DeliveryEventService.SecretsManager.csproj src/PJI.DeliveryEventService.SecretsManager/
 
