@@ -1,32 +1,29 @@
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using PJI.DeliveryEventService;
-using PJI.DeliveryEventService.HealthChecks;
-using PJI.DeliveryEventService.Infrastructure;
+using PJI.DeliveryEventService.SecretsManager;
 using System.Diagnostics.CodeAnalysis;
 
-var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.UseShutdownTimeout(TimeSpan.FromSeconds(30));
-builder.AddServices();
+namespace PJI.DeliveryEventService;
 
-var app = builder.Build();
-
-app.UseRouting();
-app.MapHealthChecks("/", new HealthCheckOptions { Predicate = c => c.Tags.Contains(Tags.Health) });
-app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = c => c.Tags.Contains(Tags.Health) });
-app.MapHealthChecks("/readiness", new HealthCheckOptions { Predicate = c => c.Tags.Contains(Tags.Readiness) });
-
-if (app.Configuration.GetValue<bool>("EnableDocs"))
-{
-    app.MapOpenApi();
-}
-
-app.UseExceptionHandler();
-app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-
-await app.RunAsync();
-
+/// <summary>
+/// Local development entry point. The same <see cref="Startup"/> is used by
+/// the Lambda hosting model (<see cref="LambdaEntryPoint"/>) so service
+/// registration and the middleware pipeline stay in one place.
+/// </summary>
 [ExcludeFromCodeCoverage(Justification = "Application entry point.")]
-public partial class Program { }
+public class Program
+{
+    public static Task Main(string[] args)
+    {
+        return CreateHostBuilder(args).Build().RunAsync();
+    }
+
+    public static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration((ctx, config) =>
+                config.AddSecretsManager(ctx.Configuration))
+            .ConfigureWebHostDefaults(webBuilder =>
+            {
+                webBuilder
+                    .UseShutdownTimeout(TimeSpan.FromSeconds(30))
+                    .UseStartup<Startup>();
+            });
+}

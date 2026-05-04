@@ -23,14 +23,14 @@ namespace PJI.DeliveryEventService;
 [ExcludeFromCodeCoverage]
 internal static class ServiceCollectionExtensions
 {
-    internal static void AddServices(this WebApplicationBuilder builder)
+    /// <summary>
+    /// Registers all application services. Invoked from both the local
+    /// development host (<see cref="Program"/>) and the Lambda hosting
+    /// model (<see cref="LambdaEntryPoint"/>) via <see cref="Startup"/>.
+    /// </summary>
+    internal static void AddServices(this IServiceCollection services, IConfiguration configuration)
     {
-        builder.Configuration.AddSecretsManager(builder.Configuration);
-
-        AddSerilog(builder);
-
-        var services = builder.Services;
-        var configuration = builder.Configuration;
+        AddSerilog(services, configuration);
 
         AddSecretsRefresh(services, configuration);
         AddAwsServices(services, configuration);
@@ -39,43 +39,56 @@ internal static class ServiceCollectionExtensions
         AddHealthChecks(services);
         AddHandlers(services, configuration);
         AddMessaging(services, configuration);
-        AddDispatcher(services);
+        AddDispatcher(services, configuration);
         AddCloudApiClient(services, configuration);
         AddInfrastructure(services);
     }
 
-    private static void AddSerilog(WebApplicationBuilder builder)
+    private static void AddSerilog(IServiceCollection services, IConfiguration configuration)
     {
-        var configuration = builder.Configuration;
         var logLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevel");
 
-        var fileLogger = SerilogLoggerConfig(configuration, allowOverrides: true)
-            .MinimumLevel.Is(logLevel)
-            .WriteTo.File(
-                new RenderedCompactJsonFormatter(),
-                path: configuration.GetValue<string>("Serilog:PathAndFileNameBase")!,
-                restrictedToMinimumLevel: logLevel,
-                fileSizeLimitBytes: configuration.GetValue<long>("Serilog:FileSizeLimitBytes"),
-                rollOnFileSizeLimit: true,
-                retainedFileCountLimit: configuration.GetValue<int>("Serilog:RetainedFileLimitCount"))
-            .CreateLogger();
+        // Lambda's filesystem is ephemeral - the File sink is only useful for
+        // local/container hosting. Detect Lambda via the runtime-injected env
+        // var and fall back to console-only logging when present.
+        var isLambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
+        var fileLogPath = configuration.GetValue<string>("Serilog:PathAndFileNameBase");
+        var enableFileLog = !isLambda && !string.IsNullOrEmpty(fileLogPath);
 
-        builder.Logging.ClearProviders();
-        builder.Logging.AddSerilog(fileLogger);
-
-        if (configuration.GetValue<bool>("Serilog:EnableConsoleLog"))
+        services.AddLogging(loggingBuilder =>
         {
-            var consoleLogLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevelForConsole");
+            loggingBuilder.ClearProviders();
 
-            var consoleLogger = SerilogLoggerConfig(configuration, allowOverrides: false)
-                .MinimumLevel.Is(consoleLogLevel)
-                .WriteTo.Console(
-                    new RenderedCompactJsonFormatter(),
-                    restrictedToMinimumLevel: consoleLogLevel)
-                .CreateLogger();
+            if (enableFileLog)
+            {
+                var fileLogger = SerilogLoggerConfig(configuration, allowOverrides: true)
+                    .MinimumLevel.Is(logLevel)
+                    .WriteTo.File(
+                        new RenderedCompactJsonFormatter(),
+                        path: fileLogPath!,
+                        restrictedToMinimumLevel: logLevel,
+                        fileSizeLimitBytes: configuration.GetValue<long>("Serilog:FileSizeLimitBytes"),
+                        rollOnFileSizeLimit: true,
+                        retainedFileCountLimit: configuration.GetValue<int>("Serilog:RetainedFileLimitCount"))
+                    .CreateLogger();
 
-            builder.Logging.AddSerilog(consoleLogger);
-        }
+                loggingBuilder.AddSerilog(fileLogger);
+            }
+
+            if (configuration.GetValue<bool>("Serilog:EnableConsoleLog") || isLambda)
+            {
+                var consoleLogLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevelForConsole");
+
+                var consoleLogger = SerilogLoggerConfig(configuration, allowOverrides: false)
+                    .MinimumLevel.Is(consoleLogLevel)
+                    .WriteTo.Console(
+                        new RenderedCompactJsonFormatter(),
+                        restrictedToMinimumLevel: consoleLogLevel)
+                    .CreateLogger();
+
+                loggingBuilder.AddSerilog(consoleLogger);
+            }
+        });
     }
 
     private static LoggerConfiguration SerilogLoggerConfig(IConfiguration configuration, bool allowOverrides)
@@ -165,8 +178,18 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<IDeliveryEventQueue, DeliveryEventQueue>();
     }
 
-    private static void AddDispatcher(IServiceCollection services)
+    private static void AddDispatcher(IServiceCollection services, IConfiguration configuration)
     {
+        // The dispatcher background worker is unrelated to the HTTP API and
+        // is intended to run as a separate deployment. Allow it to be
+        // disabled via configuration so the API Lambda does not poll SQS.
+        // Defaults to true to preserve existing local-development behaviour.
+        var enableDispatcher = configuration.GetValue("EnableDispatcher", true);
+        if (!enableDispatcher)
+        {
+            return;
+        }
+
         services.AddSingleton<IDeliveryEventProcessor, DroppedOffEventProcessor>();
 
         services.AddHostedService<DeliveryEventDispatcher>(sp =>

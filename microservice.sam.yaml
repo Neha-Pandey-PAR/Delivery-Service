@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: PJI Delivery Event Service - API Lambda exposed via API Gateway
+
+Parameters:
+  paramEnvironment:
+    Type: String
+    Default: dev
+    Description: Environment Deploying To
+  paramFeatureBranch:
+    Type: String
+    Description: Provide the name of the feature branch if this is not a build from the master code branch.
+    Default: ""
+  paramServiceName:
+    Type: String
+    Description: The name of the service
+    Default: pji-delivery-event-service
+  paramReleaseVersion:
+    Type: String
+    Description: The Release Version number
+    Default: 0.0.1
+  paramBaseDomain:
+    Type: String
+    Description: Base Domain
+    Default: bas.brinkpos.io
+  paramLambdaSubnetA:
+    Type: String
+    Default: ""
+  paramLambdaSubnetB:
+    Type: String
+    Default: ""
+  paramLambdaSecurityGroup:
+    Type: String
+    Default: ""
+  paramHmacClientsSecretName:
+    Type: String
+    Description: Secrets Manager secret holding HMAC client credentials
+    Default: "mkumawat-pji-delivery-event-service-hmac-clients"
+  paramPersistenceQueueName:
+    Type: String
+    Description: SQS FIFO queue used to persist delivery events
+    Default: "mkumawat-pji-delivery-event-service-persistence.fifo"
+  paramCloudApiOrderServiceBaseUrl:
+    Type: String
+    Description: Base URL of the Cloud API Order Service
+    Default: "https://dev1api.api.parpos.com/order/"
+
+Conditions:
+  conditionIsProd: !Equals [ !Ref paramEnvironment, prod ]
+  condIsLocal: !Equals [ !Ref paramEnvironment, local ]
+  condNotLocal: !Not [ !Equals [ !Ref paramEnvironment, local ] ]
+  condIsFeatureBranch: !Not [ !Equals [ !Ref paramFeatureBranch, "" ] ]
+  condNotFeatureBranch: !Equals [ !Ref paramFeatureBranch, "" ]
+
+Resources:
+  # -------------------------------------------------------------------------
+  # API Lambda - hosts the ASP.NET Core controllers behind API Gateway.
+  # The background SQS dispatcher is intentionally disabled here
+  # (EnableDispatcher=false) so that the API Lambda only validates and
+  # enqueues messages. The dispatcher continues to run as a separate
+  # deployment (its existing host).
+  # -------------------------------------------------------------------------
+  resWebApiProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${paramEnvironment}-${paramServiceName}-api"
+      PackageType: Image
+      ImageConfig:
+        Command:
+          - PJI.DeliveryEventService::PJI.DeliveryEventService.LambdaEntryPoint::FunctionHandlerAsync
+      MemorySize: 1536
+      Timeout: 30
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonSQSFullAccess
+        - SecretsManagerReadWrite
+        - Statement:
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource: '*'
+      Environment:
+        Variables:
+          ASPNETCORE_ENVIRONMENT: !Sub "${paramEnvironment}"
+          AWS_LAMBDA_HANDLER_LOG_FORMAT: Unformatted
+          RELEASE_VERSION: !Sub "${paramReleaseVersion}"
+          SERVICE_NAME: !Sub "${paramServiceName}"
+
+          # Disable the SQS background dispatcher in the API Lambda - it
+          # remains a separate deployment.
+          EnableDispatcher: "false"
+
+          # Disable OpenAPI in deployed environments.
+          EnableDocs: "false"
+
+          # Application configuration overrides (double-underscore =
+          # IConfiguration section separator).
+          Sqs__PersistenceQueueName: !Sub "${paramPersistenceQueueName}"
+          CloudApiOrderService__BaseUrl: !Sub "${paramCloudApiOrderServiceBaseUrl}"
+          Secrets__HmacClients__Name: !Sub "${paramHmacClientsSecretName}"
+      VpcConfig: !If
+        - condNotLocal
+        - SecurityGroupIds:
+            - !Ref paramLambdaSecurityGroup
+          SubnetIds:
+            - !Ref paramLambdaSubnetA
+            - !Ref paramLambdaSubnetB
+        - !Ref 'AWS::NoValue'
+      Events:
+        # HMAC auth is enforced inside the application (HmacAuthenticationHandler),
+        # so API Gateway proxies all paths through to the Lambda without its
+        # own authorizer.
+        HealthEventSource:
+          Type: Api
+          Properties:
+            RestApiId: !Ref resApiGateway
+            Path: /health
+            Method: GET
+        RootHealthEventSource:
+          Type: Api
+          Properties:
+            RestApiId: !Ref resApiGateway
+            Path: /
+            Method: GET
+        ReadinessEventSource:
+          Type: Api
+          Properties:
+            RestApiId: !Ref resApiGateway
+            Path: /readiness
+            Method: GET
+        VersionedApiEventSource:
+          Type: Api
+          Properties:
+            RestApiId: !Ref resApiGateway
+            Path: /v1/{proxy+}
+            Method: ANY
+      Tags:
+        project: "pji"
+        owner: "devops"
+        owner_email: "hosting_aws@partech.com"
+        provisioner: "cloudformation"
+        environment: !Sub "${paramEnvironment}"
+        servicename: !Sub "${paramServiceName}"
+        cost_service_name: !Sub "${paramServiceName}"
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: !Sub "${paramReleaseVersion}"
+
+  # -------------------------------------------------------------------------
+  # API Gateway - REST API fronting the Lambda. HMAC validation is performed
+  # by the application itself, so no API Gateway authorizer is configured.
+  # -------------------------------------------------------------------------
+  resApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${paramEnvironment}-${paramServiceName}-api"
+      StageName: !Sub "${paramEnvironment}"
+      AccessLogSetting:
+        DestinationArn: !GetAtt resApiGatewayLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","extendedRequestId":"$context.extendedRequestId","sourceIp":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","requestPath":"$context.path","status":"$context.status","protocol":"$context.protocol","responseLength":"$context.responseLength","responseTime":"$context.responseTime"}'
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          DataTraceEnabled: false
+          LoggingLevel: INFO
+          MetricsEnabled: true
+
+  resApiGatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/apigateway/${paramEnvironment}-${paramServiceName}"
+      RetentionInDays: 30
+
+  resLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${paramEnvironment}-${paramServiceName}-api"
+      RetentionInDays: 30
+
+  # -------------------------------------------------------------------------
+  # Custom domain mapping (skipped for local environment).
+  # -------------------------------------------------------------------------
+  resAPIBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Condition: condNotLocal
+    DependsOn: "resApiGatewayStage"
+    Properties:
+      BasePath: !If
+        - condNotFeatureBranch
+        - !Sub "${paramServiceName}"
+        - !Sub "${paramServiceName}-${paramFeatureBranch}"
+      DomainName: !Sub "api.${paramEnvironment}.${paramBaseDomain}"
+      RestApiId: !Ref resApiGateway
+      Stage: !Ref paramEnvironment
+
+Outputs:
+  ApiGatewayUrl:
+    Description: Invoke URL for the API Gateway stage
+    Value: !Sub "https://${resApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${paramEnvironment}"
+
+  ApiLambdaFunctionArn:
+    Description: ARN of the API Lambda function
+    Value: !GetAtt resWebApiProxyFunction.Arn
