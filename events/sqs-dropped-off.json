@@ -1,0 +1,20 @@
+{
+  "Records": [
+    {
+      "messageId": "test-message-id-001",
+      "receiptHandle": "test-receipt-handle",
+      "body": "{\"EventType\":\"dropped-off\",\"EventId\":\"evt-001\",\"LocationNumber\":12345,\"ClientName\":\"TestClient\",\"CorrelationId\":\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\"Payload\":{\"OrderId\":999001,\"IsInternal\":false,\"EmployeeId\":null}}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1620000000000",
+        "SenderId": "SENDER-ID",
+        "ApproximateFirstReceiveTimestamp": "1620000000001"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "abc123",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:123456789012:test-queue.fifo",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}
