@@ -1,0 +1,23 @@
+# Build artifacts
+**/bin/
+**/obj/
+dist/
+
+# Test results / coverage
+TestResults/
+coverage*.xml
+*.coverage
+
+# IDE / VCS
+.git/
+.vs/
+.vscode/
+.idea/
+
+# Logs
+**/logs/
+*.log
+
+# Misc
+**/*.user
+node_modules/

@@ -6,5 +6,8 @@
   <Project Path="src/PJI.DeliveryEventService/PJI.DeliveryEventService.csproj" />
   <Project Path="src/PJI.DeliveryEventService.SecretsManager/PJI.DeliveryEventService.SecretsManager.csproj" />
   <Project Path="src/PJI.DeliveryEventService.SecretsManager.Tests/PJI.DeliveryEventService.SecretsManager.Tests.csproj" />
+  <Project Path="src/PJI.DeliveryEventService.Shared/PJI.DeliveryEventService.Shared.csproj" />
+  <Project Path="src/PJI.DeliveryEventService.SqsDispatcher/PJI.DeliveryEventService.SqsDispatcher.csproj" />
+  <Project Path="src/PJI.DeliveryEventService.SqsDispatcher.Tests/PJI.DeliveryEventService.SqsDispatcher.Tests.csproj" />
   <Project Path="src/PJI.DeliveryEventService.Tests/PJI.DeliveryEventService.Tests.csproj" />
 </Solution>

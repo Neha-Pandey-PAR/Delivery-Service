@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<OutputType>Library</OutputType>
+		<AssemblyName>PJI.DeliveryEventService.SqsDispatcher</AssemblyName>
+		<RootNamespace>PJI.DeliveryEventService.SqsDispatcher</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Amazon.Lambda.Core" />
+		<PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" />
+		<PackageReference Include="Amazon.Lambda.SQSEvents" />
+		<PackageReference Include="AWSSDK.Extensions.NETCore.Setup" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" />
+		<PackageReference Include="Microsoft.Extensions.Http" />
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Formatting.Compact" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Reference shared project for shared configuration and messaging models -->
+		<ProjectReference Include="..\PJI.DeliveryEventService.Shared\PJI.DeliveryEventService.Shared.csproj" />
+		<ProjectReference Include="..\PJI.DeliveryEventService.SecretsManager\PJI.DeliveryEventService.SecretsManager.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="PJI.DeliveryEventService.SqsDispatcher.Tests" />
+	</ItemGroup>
+
+</Project>

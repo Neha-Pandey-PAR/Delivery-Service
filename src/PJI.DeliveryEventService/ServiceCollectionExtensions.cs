@@ -1,12 +1,8 @@
 using Amazon.SQS;
 using Asp.Versioning;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using PJI.DeliveryEventService.Authentication;
-using PJI.DeliveryEventService.CloudApiClient;
 using PJI.DeliveryEventService.Configuration;
-using PJI.DeliveryEventService.Dispatcher;
-using PJI.DeliveryEventService.Dispatcher.Processors;
 using PJI.DeliveryEventService.Handlers.DroppedOff;
 using PJI.DeliveryEventService.HealthChecks;
 using PJI.DeliveryEventService.Infrastructure;
@@ -23,14 +19,14 @@ namespace PJI.DeliveryEventService;
 [ExcludeFromCodeCoverage]
 internal static class ServiceCollectionExtensions
 {
-    internal static void AddServices(this WebApplicationBuilder builder)
+    /// <summary>
+    /// Registers all application services. Invoked from both the local
+    /// development host (<see cref="Program"/>) and the Lambda hosting
+    /// model (<see cref="LambdaEntryPoint"/>) via <see cref="Startup"/>.
+    /// </summary>
+    internal static void AddServices(this IServiceCollection services, IConfiguration configuration)
     {
-        builder.Configuration.AddSecretsManager(builder.Configuration);
-
-        AddSerilog(builder);
-
-        var services = builder.Services;
-        var configuration = builder.Configuration;
+        AddSerilog(services, configuration);
 
         AddSecretsRefresh(services, configuration);
         AddAwsServices(services, configuration);
@@ -39,43 +35,55 @@ internal static class ServiceCollectionExtensions
         AddHealthChecks(services);
         AddHandlers(services, configuration);
         AddMessaging(services, configuration);
-        AddDispatcher(services);
-        AddCloudApiClient(services, configuration);
+        AddMessagingInfrastructure(services);
         AddInfrastructure(services);
     }
 
-    private static void AddSerilog(WebApplicationBuilder builder)
+    private static void AddSerilog(IServiceCollection services, IConfiguration configuration)
     {
-        var configuration = builder.Configuration;
         var logLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevel");
 
-        var fileLogger = SerilogLoggerConfig(configuration, allowOverrides: true)
-            .MinimumLevel.Is(logLevel)
-            .WriteTo.File(
-                new RenderedCompactJsonFormatter(),
-                path: configuration.GetValue<string>("Serilog:PathAndFileNameBase")!,
-                restrictedToMinimumLevel: logLevel,
-                fileSizeLimitBytes: configuration.GetValue<long>("Serilog:FileSizeLimitBytes"),
-                rollOnFileSizeLimit: true,
-                retainedFileCountLimit: configuration.GetValue<int>("Serilog:RetainedFileLimitCount"))
-            .CreateLogger();
+        // Lambda's filesystem is ephemeral - the File sink is only useful for
+        // local/container hosting. Detect Lambda via the runtime-injected env
+        // var and fall back to console-only logging when present.
+        var isLambda = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME"));
+        var fileLogPath = configuration.GetValue<string>("Serilog:PathAndFileNameBase");
+        var enableFileLog = !isLambda && !string.IsNullOrEmpty(fileLogPath);
 
-        builder.Logging.ClearProviders();
-        builder.Logging.AddSerilog(fileLogger);
-
-        if (configuration.GetValue<bool>("Serilog:EnableConsoleLog"))
+        services.AddLogging(loggingBuilder =>
         {
-            var consoleLogLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevelForConsole");
+            loggingBuilder.ClearProviders();
 
-            var consoleLogger = SerilogLoggerConfig(configuration, allowOverrides: false)
-                .MinimumLevel.Is(consoleLogLevel)
-                .WriteTo.Console(
-                    new RenderedCompactJsonFormatter(),
-                    restrictedToMinimumLevel: consoleLogLevel)
-                .CreateLogger();
+            if (enableFileLog)
+            {
+                var fileLogger = SerilogLoggerConfig(configuration, allowOverrides: true)
+                    .MinimumLevel.Is(logLevel)
+                    .WriteTo.File(
+                        new RenderedCompactJsonFormatter(),
+                        path: fileLogPath!,
+                        restrictedToMinimumLevel: logLevel,
+                        fileSizeLimitBytes: configuration.GetValue<long>("Serilog:FileSizeLimitBytes"),
+                        rollOnFileSizeLimit: true,
+                        retainedFileCountLimit: configuration.GetValue<int>("Serilog:RetainedFileLimitCount"))
+                    .CreateLogger();
 
-            builder.Logging.AddSerilog(consoleLogger);
-        }
+                loggingBuilder.AddSerilog(fileLogger);
+            }
+
+            if (configuration.GetValue<bool>("Serilog:EnableConsoleLog") || isLambda)
+            {
+                var consoleLogLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevelForConsole");
+
+                var consoleLogger = SerilogLoggerConfig(configuration, allowOverrides: false)
+                    .MinimumLevel.Is(consoleLogLevel)
+                    .WriteTo.Console(
+                        new RenderedCompactJsonFormatter(),
+                        restrictedToMinimumLevel: consoleLogLevel)
+                    .CreateLogger();
+
+                loggingBuilder.AddSerilog(consoleLogger);
+            }
+        });
     }
 
     private static LoggerConfiguration SerilogLoggerConfig(IConfiguration configuration, bool allowOverrides)
@@ -147,10 +155,9 @@ internal static class ServiceCollectionExtensions
 
     private static void AddHealthChecks(IServiceCollection services)
     {
-        services.AddSingleton<DispatcherReadinessCheck>();
         services.AddHealthChecks()
             .AddCheck("liveness", () => HealthCheckResult.Healthy(), tags: [Tags.Health])
-            .AddCheck<DispatcherReadinessCheck>("readiness", tags: [Tags.Readiness]);
+            .AddCheck("readiness", () => HealthCheckResult.Healthy(), tags: [Tags.Readiness]);
     }
 
     private static void AddHandlers(IServiceCollection services, IConfiguration configuration)
@@ -165,43 +172,12 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<IDeliveryEventQueue, DeliveryEventQueue>();
     }
 
-    private static void AddDispatcher(IServiceCollection services)
+    private static void AddMessagingInfrastructure(IServiceCollection services)
     {
-        services.AddSingleton<IDeliveryEventProcessor, DroppedOffEventProcessor>();
-
-        services.AddHostedService<DeliveryEventDispatcher>(sp =>
-        {
-            var sqsClient = sp.GetRequiredService<IAmazonSQS>();
-            var sqsOptions = sp.GetRequiredService<IOptions<SqsOptions>>();
-
-            // Resolve queue URL from queue name once at startup, before the dispatcher starts polling.
-            if (string.IsNullOrEmpty(sqsOptions.Value.PersistenceQueueUrl))
-            {
-                sqsOptions.Value.PersistenceQueueUrl = sqsClient
-                    .GetQueueUrlAsync(sqsOptions.Value.PersistenceQueueName)
-                    .GetAwaiter().GetResult().QueueUrl;
-            }
-
-            return new DeliveryEventDispatcher(
-                sp.GetServices<IDeliveryEventProcessor>(),
-                sqsClient,
-                sqsOptions,
-                sp.GetRequiredService<ILogger<DeliveryEventDispatcher>>(),
-                sp.GetRequiredService<DispatcherReadinessCheck>());
-        });
-    }
-
-    private static void AddCloudApiClient(IServiceCollection services, IConfiguration configuration)
-    {
-        services.Configure<CloudApiOrderServiceOptions>(configuration.GetSection("CloudApiOrderService"));
-        services.AddTransient<TraceparentPropagationHandler>();
-        services.AddHttpClient<ICloudApiOrderServiceClient, CloudApiOrderServiceClient>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<IOptions<CloudApiOrderServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
-        })
-        .AddHttpMessageHandler<TraceparentPropagationHandler>();
+        // Resolves the SQS queue URL at startup. Required by DeliveryEventQueue
+        // which sends messages to SQS. The actual message processing is now
+        // handled by the separate SqsDispatcher Lambda triggered by SQS.
+        services.AddHostedService<SqsQueueUrlResolver>();
     }
 
     private static void AddInfrastructure(IServiceCollection services)
