@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>PJI.DeliveryEventService</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="PJI.DeliveryEventService" />
+		<InternalsVisibleTo Include="PJI.DeliveryEventService.SqsDispatcher" />
+		<InternalsVisibleTo Include="PJI.DeliveryEventService.Tests" />
+		<InternalsVisibleTo Include="PJI.DeliveryEventService.SqsDispatcher.Tests" />
+	</ItemGroup>
+
+</Project>

@@ -1,12 +1,8 @@
 using Amazon.SQS;
 using Asp.Versioning;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Options;
 using PJI.DeliveryEventService.Authentication;
-using PJI.DeliveryEventService.CloudApiClient;
 using PJI.DeliveryEventService.Configuration;
-using PJI.DeliveryEventService.Dispatcher;
-using PJI.DeliveryEventService.Dispatcher.Processors;
 using PJI.DeliveryEventService.Handlers.DroppedOff;
 using PJI.DeliveryEventService.HealthChecks;
 using PJI.DeliveryEventService.Infrastructure;
@@ -39,49 +35,8 @@ internal static class ServiceCollectionExtensions
         AddHealthChecks(services);
         AddHandlers(services, configuration);
         AddMessaging(services, configuration);
-        AddDispatcher(services, configuration);
-        AddCloudApiClient(services, configuration);
+        AddMessagingInfrastructure(services);
         AddInfrastructure(services);
-    }
-
-    /// <summary>
-    /// Registers services required by the SQS-triggered Lambda function
-    /// (<see cref="SqsLambdaEntryPoint"/>). This is a minimal set of services
-    /// focused on processing delivery event messages and calling the Cloud API.
-    /// </summary>
-    /// <remarks>
-    /// Unlike <see cref="AddServices"/>, this method does not register:
-    /// <list type="bullet">
-    ///   <item>ASP.NET Core controllers, API versioning, or HTTP handlers</item>
-    ///   <item>Health check endpoints</item>
-    ///   <item>The <see cref="SqsQueueUrlResolver"/> (Lambda gets queue from event trigger)</item>
-    ///   <item>The <see cref="DeliveryEventDispatcher"/> background service</item>
-    ///   <item>The <see cref="IDeliveryEventQueue"/> for enqueuing (Lambda only consumes)</item>
-    /// </list>
-    /// </remarks>
-    internal static void AddSqsLambdaServices(this IServiceCollection services, IConfiguration configuration)
-    {
-        AddSerilog(services, configuration);
-        AddAwsServices(services, configuration);
-        AddProcessors(services, configuration);
-        AddCloudApiClient(services, configuration);
-    }
-
-    /// <summary>
-    /// Registers delivery event processors and the SQS message handler.
-    /// Used by both the SQS Lambda and the background dispatcher.
-    /// </summary>
-    private static void AddProcessors(IServiceCollection services, IConfiguration configuration)
-    {
-        // Configuration options needed by processors
-        services.Configure<HmacClientsOptions>(configuration.GetSection(HmacClientsOptions.SectionName));
-        services.Configure<LocationOptions>(configuration.GetSection(LocationOptions.SectionName));
-
-        // Event processors - add new processors here as event types are added
-        services.AddScoped<IDeliveryEventProcessor, DroppedOffEventProcessor>();
-
-        // SQS message handler that routes messages to processors
-        services.AddScoped<ISqsMessageHandler, SqsMessageHandler>();
     }
 
     private static void AddSerilog(IServiceCollection services, IConfiguration configuration)
@@ -200,10 +155,9 @@ internal static class ServiceCollectionExtensions
 
     private static void AddHealthChecks(IServiceCollection services)
     {
-        services.AddSingleton<DispatcherReadinessCheck>();
         services.AddHealthChecks()
             .AddCheck("liveness", () => HealthCheckResult.Healthy(), tags: [Tags.Health])
-            .AddCheck<DispatcherReadinessCheck>("readiness", tags: [Tags.Readiness]);
+            .AddCheck("readiness", () => HealthCheckResult.Healthy(), tags: [Tags.Readiness]);
     }
 
     private static void AddHandlers(IServiceCollection services, IConfiguration configuration)
@@ -218,50 +172,12 @@ internal static class ServiceCollectionExtensions
         services.AddScoped<IDeliveryEventQueue, DeliveryEventQueue>();
     }
 
-    private static void AddDispatcher(IServiceCollection services, IConfiguration configuration)
+    private static void AddMessagingInfrastructure(IServiceCollection services)
     {
-        // The API path also needs the queue URL resolved (DeliveryEventQueue
-        // reads it from SqsOptions). Register a hosted service that resolves
-        // it once at startup regardless of whether the dispatcher itself runs.
+        // Resolves the SQS queue URL at startup. Required by DeliveryEventQueue
+        // which sends messages to SQS. The actual message processing is now
+        // handled by the separate SqsDispatcher Lambda triggered by SQS.
         services.AddHostedService<SqsQueueUrlResolver>();
-
-        // The dispatcher background worker is unrelated to the HTTP API and
-        // is intended to run as a separate deployment. Allow it to be
-        // disabled via configuration so the API Lambda does not poll SQS.
-        // Defaults to true to preserve existing local-development behaviour.
-        var enableDispatcher = configuration.GetValue("EnableDispatcher", true);
-        if (!enableDispatcher)
-        {
-            return;
-        }
-
-        services.AddSingleton<IDeliveryEventProcessor, DroppedOffEventProcessor>();
-
-        services.AddHostedService<DeliveryEventDispatcher>(sp =>
-        {
-            var sqsClient = sp.GetRequiredService<IAmazonSQS>();
-            var sqsOptions = sp.GetRequiredService<IOptions<SqsOptions>>();
-
-            return new DeliveryEventDispatcher(
-                sp.GetServices<IDeliveryEventProcessor>(),
-                sqsClient,
-                sqsOptions,
-                sp.GetRequiredService<ILogger<DeliveryEventDispatcher>>(),
-                sp.GetRequiredService<DispatcherReadinessCheck>());
-        });
-    }
-
-    private static void AddCloudApiClient(IServiceCollection services, IConfiguration configuration)
-    {
-        services.Configure<CloudApiOrderServiceOptions>(configuration.GetSection("CloudApiOrderService"));
-        services.AddTransient<TraceparentPropagationHandler>();
-        services.AddHttpClient<ICloudApiOrderServiceClient, CloudApiOrderServiceClient>((sp, client) =>
-        {
-            var opts = sp.GetRequiredService<IOptions<CloudApiOrderServiceOptions>>().Value;
-            client.BaseAddress = new Uri(opts.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
-        })
-        .AddHttpMessageHandler<TraceparentPropagationHandler>();
     }
 
     private static void AddInfrastructure(IServiceCollection services)

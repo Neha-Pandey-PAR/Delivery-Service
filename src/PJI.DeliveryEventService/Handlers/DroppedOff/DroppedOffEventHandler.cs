@@ -4,6 +4,7 @@ using PJI.DeliveryEventService.Handlers.DroppedOff.Models;
 using PJI.DeliveryEventService.Infrastructure;
 using PJI.DeliveryEventService.Messaging;
 using PJI.DeliveryEventService.Messaging.Models;
+using PJI.DeliveryEventService.Models;
 using System.Text.Json;
 
 namespace PJI.DeliveryEventService.Handlers.DroppedOff;

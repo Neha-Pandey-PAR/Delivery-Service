@@ -25,6 +25,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\PJI.DeliveryEventService.SecretsManager\PJI.DeliveryEventService.SecretsManager.csproj" />
+		<ProjectReference Include="..\PJI.DeliveryEventService.Shared\PJI.DeliveryEventService.Shared.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

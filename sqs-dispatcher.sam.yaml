@@ -1,0 +1,130 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: PJI Delivery Event Service - SQS Dispatcher Lambda
+
+Parameters:
+  paramEnvironment:
+    Type: String
+    Default: dev
+    Description: Environment Deploying To
+  paramFeatureBranch:
+    Type: String
+    Description: Provide the name of the feature branch if this is not a build from the master code branch.
+    Default: ""
+  paramServiceName:
+    Type: String
+    Description: The name of the service
+    Default: pji-delivery-event-service
+  paramReleaseVersion:
+    Type: String
+    Description: The Release Version number
+    Default: 0.0.1
+  paramLambdaSubnetA:
+    Type: String
+    Default: ""
+  paramLambdaSubnetB:
+    Type: String
+    Default: ""
+  paramLambdaSecurityGroup:
+    Type: String
+    Default: ""
+  paramHmacClientsSecretName:
+    Type: String
+    Description: Secrets Manager secret holding HMAC client credentials
+    Default: "mkumawat-pji-delivery-event-service-hmac-clients"
+  paramPersistenceQueueName:
+    Type: String
+    Description: SQS FIFO queue used to persist delivery events
+    Default: "mkumawat-pji-delivery-event-service-persistence.fifo"
+  paramCloudApiOrderServiceBaseUrl:
+    Type: String
+    Description: Base URL of the Cloud API Order Service
+    Default: "https://dev1api.api.parpos.com/order/"
+
+Conditions:
+  condIsLocal: !Equals [ !Ref paramEnvironment, local ]
+  condNotLocal: !Not [ !Equals [ !Ref paramEnvironment, local ] ]
+
+Resources:
+  # -------------------------------------------------------------------------
+  # SQS Dispatcher Lambda - processes delivery events from the SQS queue
+  # and calls the Cloud API to close orders. Triggered directly by SQS
+  # event source mapping (no polling loop needed).
+  # -------------------------------------------------------------------------
+  resSqsDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${paramEnvironment}-${paramServiceName}-sqs-dispatcher"
+      PackageType: Image
+      ImageConfig:
+        Command:
+          - PJI.DeliveryEventService.SqsDispatcher::PJI.DeliveryEventService.SqsDispatcher.SqsLambdaEntryPoint::FunctionHandlerAsync
+      MemorySize: 1024
+      Timeout: 60
+      # Limit concurrent executions to avoid overwhelming downstream services.
+      # Adjust based on Cloud API capacity and expected message volume.
+      ReservedConcurrentExecutions: 10
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonSQSFullAccess
+        - SecretsManagerReadWrite
+        - Statement:
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource: '*'
+      Environment:
+        Variables:
+          ASPNETCORE_ENVIRONMENT: !Sub "${paramEnvironment}"
+          AWS_LAMBDA_HANDLER_LOG_FORMAT: Unformatted
+          RELEASE_VERSION: !Sub "${paramReleaseVersion}"
+          SERVICE_NAME: !Sub "${paramServiceName}-sqs-dispatcher"
+
+          # Application configuration overrides
+          CloudApiOrderService__BaseUrl: !Sub "${paramCloudApiOrderServiceBaseUrl}"
+          Secrets__HmacClients__Name: !Sub "${paramHmacClientsSecretName}"
+      VpcConfig: !If
+        - condNotLocal
+        - SecurityGroupIds:
+            - !Ref paramLambdaSecurityGroup
+          SubnetIds:
+            - !Ref paramLambdaSubnetA
+            - !Ref paramLambdaSubnetB
+        - !Ref 'AWS::NoValue'
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${paramPersistenceQueueName}"
+            BatchSize: 10
+            # Enable partial batch failure reporting - only failed messages
+            # are returned to the queue for retry.
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+      Tags:
+        project: "pji"
+        owner: "devops"
+        owner_email: "hosting_aws@partech.com"
+        provisioner: "cloudformation"
+        environment: !Sub "${paramEnvironment}"
+        servicename: !Sub "${paramServiceName}-sqs-dispatcher"
+        cost_service_name: !Sub "${paramServiceName}"
+    Metadata:
+      Dockerfile: Dockerfile.SqsDispatcher
+      DockerContext: .
+      DockerTag: !Sub "${paramReleaseVersion}"
+
+  resSqsDispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${paramEnvironment}-${paramServiceName}-sqs-dispatcher"
+      RetentionInDays: 30
+
+Outputs:
+  SqsDispatcherLambdaFunctionArn:
+    Description: ARN of the SQS Dispatcher Lambda function
+    Value: !GetAtt resSqsDispatcherFunction.Arn
+
+  SqsDispatcherLambdaFunctionName:
+    Description: Name of the SQS Dispatcher Lambda function
+    Value: !Ref resSqsDispatcherFunction
