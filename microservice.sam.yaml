@@ -148,6 +148,80 @@ Resources:
       DockerTag: !Sub "${paramReleaseVersion}"
 
   # -------------------------------------------------------------------------
+  # SQS Dispatcher Lambda - processes delivery events from the SQS queue
+  # and calls the Cloud API to close orders. Triggered directly by SQS
+  # event source mapping (no polling loop needed).
+  # -------------------------------------------------------------------------
+  resSqsDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${paramEnvironment}-${paramServiceName}-sqs-dispatcher"
+      PackageType: Image
+      ImageConfig:
+        Command:
+          - PJI.DeliveryEventService::PJI.DeliveryEventService.SqsLambdaEntryPoint::FunctionHandlerAsync
+      MemorySize: 1024
+      Timeout: 60
+      # Limit concurrent executions to avoid overwhelming downstream services.
+      # Adjust based on Cloud API capacity and expected message volume.
+      ReservedConcurrentExecutions: 10
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - AmazonSQSFullAccess
+        - SecretsManagerReadWrite
+        - Statement:
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource: '*'
+      Environment:
+        Variables:
+          ASPNETCORE_ENVIRONMENT: !Sub "${paramEnvironment}"
+          AWS_LAMBDA_HANDLER_LOG_FORMAT: Unformatted
+          RELEASE_VERSION: !Sub "${paramReleaseVersion}"
+          SERVICE_NAME: !Sub "${paramServiceName}"
+
+          # Application configuration overrides
+          CloudApiOrderService__BaseUrl: !Sub "${paramCloudApiOrderServiceBaseUrl}"
+          Secrets__HmacClients__Name: !Sub "${paramHmacClientsSecretName}"
+      VpcConfig: !If
+        - condNotLocal
+        - SecurityGroupIds:
+            - !Ref paramLambdaSecurityGroup
+          SubnetIds:
+            - !Ref paramLambdaSubnetA
+            - !Ref paramLambdaSubnetB
+        - !Ref 'AWS::NoValue'
+      Events:
+        SqsEvent:
+          Type: SQS
+          Properties:
+            Queue: !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:${paramPersistenceQueueName}"
+            BatchSize: 10
+            # Enable partial batch failure reporting - only failed messages
+            # are returned to the queue for retry.
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+      Tags:
+        project: "pji"
+        owner: "devops"
+        owner_email: "hosting_aws@partech.com"
+        provisioner: "cloudformation"
+        environment: !Sub "${paramEnvironment}"
+        servicename: !Sub "${paramServiceName}"
+        cost_service_name: !Sub "${paramServiceName}"
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: !Sub "${paramReleaseVersion}"
+
+  resSqsDispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${paramEnvironment}-${paramServiceName}-sqs-dispatcher"
+      RetentionInDays: 30
+
+  # -------------------------------------------------------------------------
   # API Gateway - REST API fronting the Lambda. HMAC validation is performed
   # by the application itself, so no API Gateway authorizer is configured.
   # -------------------------------------------------------------------------
@@ -202,3 +276,7 @@ Outputs:
   ApiLambdaFunctionArn:
     Description: ARN of the API Lambda function
     Value: !GetAtt resWebApiProxyFunction.Arn
+
+  SqsDispatcherLambdaFunctionArn:
+    Description: ARN of the SQS Dispatcher Lambda function
+    Value: !GetAtt resSqsDispatcherFunction.Arn

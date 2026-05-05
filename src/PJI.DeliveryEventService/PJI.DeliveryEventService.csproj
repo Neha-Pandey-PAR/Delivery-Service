@@ -10,6 +10,7 @@
 		<PackageReference Include="Amazon.Lambda.AspNetCoreServer" />
 		<PackageReference Include="Amazon.Lambda.Core" />
 		<PackageReference Include="Amazon.Lambda.Serialization.SystemTextJson" />
+		<PackageReference Include="Amazon.Lambda.SQSEvents" />
 		<PackageReference Include="Asp.Versioning.Mvc" />
 		<PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" />
 		<PackageReference Include="AWSSDK.Extensions.NETCore.Setup" />

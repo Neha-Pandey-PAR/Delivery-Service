@@ -15,6 +15,7 @@
 		<PackageVersion Include="Amazon.Lambda.AspNetCoreServer" Version="9.1.1" />
 		<PackageVersion Include="Amazon.Lambda.Core" Version="2.5.1" />
 		<PackageVersion Include="Amazon.Lambda.Serialization.SystemTextJson" Version="2.4.4" />
+		<PackageVersion Include="Amazon.Lambda.SQSEvents" Version="2.2.1" />
 		<PackageVersion Include="AWSSDK.SSO" Version="4.0.2.15" />
 		<PackageVersion Include="AWSSDK.SSOOIDC" Version="4.0.3.16" />
 		<PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />

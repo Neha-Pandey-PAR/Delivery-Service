@@ -44,6 +44,46 @@ internal static class ServiceCollectionExtensions
         AddInfrastructure(services);
     }
 
+    /// <summary>
+    /// Registers services required by the SQS-triggered Lambda function
+    /// (<see cref="SqsLambdaEntryPoint"/>). This is a minimal set of services
+    /// focused on processing delivery event messages and calling the Cloud API.
+    /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="AddServices"/>, this method does not register:
+    /// <list type="bullet">
+    ///   <item>ASP.NET Core controllers, API versioning, or HTTP handlers</item>
+    ///   <item>Health check endpoints</item>
+    ///   <item>The <see cref="SqsQueueUrlResolver"/> (Lambda gets queue from event trigger)</item>
+    ///   <item>The <see cref="DeliveryEventDispatcher"/> background service</item>
+    ///   <item>The <see cref="IDeliveryEventQueue"/> for enqueuing (Lambda only consumes)</item>
+    /// </list>
+    /// </remarks>
+    internal static void AddSqsLambdaServices(this IServiceCollection services, IConfiguration configuration)
+    {
+        AddSerilog(services, configuration);
+        AddAwsServices(services, configuration);
+        AddProcessors(services, configuration);
+        AddCloudApiClient(services, configuration);
+    }
+
+    /// <summary>
+    /// Registers delivery event processors and the SQS message handler.
+    /// Used by both the SQS Lambda and the background dispatcher.
+    /// </summary>
+    private static void AddProcessors(IServiceCollection services, IConfiguration configuration)
+    {
+        // Configuration options needed by processors
+        services.Configure<HmacClientsOptions>(configuration.GetSection(HmacClientsOptions.SectionName));
+        services.Configure<LocationOptions>(configuration.GetSection(LocationOptions.SectionName));
+
+        // Event processors - add new processors here as event types are added
+        services.AddScoped<IDeliveryEventProcessor, DroppedOffEventProcessor>();
+
+        // SQS message handler that routes messages to processors
+        services.AddScoped<ISqsMessageHandler, SqsMessageHandler>();
+    }
+
     private static void AddSerilog(IServiceCollection services, IConfiguration configuration)
     {
         var logLevel = configuration.GetValue<LogEventLevel>("Serilog:MinimumLogLevel");
